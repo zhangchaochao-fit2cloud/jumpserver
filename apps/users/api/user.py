@@ -13,7 +13,7 @@ from common.utils import get_logger
 from orgs.utils import current_org, tmp_to_root_org
 from rbac.models import Role, RoleBinding
 from rbac.permissions import RBACPermission
-from users.utils import LoginBlockUtil, MFABlockUtils
+from users.utils import LoginBlockUtil, MFABlockUtils, ActiveUserBlockUtil
 from .mixins import UserQuerysetMixin
 from .. import serializers
 from ..exceptions import UnableToDeleteAllUsers
@@ -25,6 +25,7 @@ from ..serializers import (
     UserSerializer, MiniUserSerializer, InviteSerializer, UserRetrieveSerializer
 )
 from ..signals import post_user_create
+from django.conf import settings
 
 logger = get_logger(__name__)
 __all__ = [
@@ -50,6 +51,14 @@ class UserViewSet(CommonApiMixin, UserQuerysetMixin, SuggestionMixin, BulkModelV
         'remove': 'users.remove_user',
         'bulk_remove': 'users.remove_user',
     }
+
+    def update(self, request, *args, **kwargs):
+        if 'is_active' in request.data and bool(request.data['is_active']):
+            user = self.get_object()
+            ActiveUserBlockUtil(user.id, settings.ACTIVATION_NEXT_LOGIN_RETENTION_TTL).block()
+
+        resp = super().update(request, *args, **kwargs)
+        return resp
 
     def allow_bulk_destroy(self, qs, filtered):
         is_valid = filtered.count() < qs.count()

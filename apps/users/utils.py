@@ -109,9 +109,9 @@ def check_password_rules(password, is_org_admin=False):
 class BlockUtil:
     BLOCK_KEY_TMPL: str
 
-    def __init__(self, username):
+    def __init__(self, username, limit_time=None):
         self.block_key = self.BLOCK_KEY_TMPL.format(username)
-        self.key_ttl = int(settings.SECURITY_LOGIN_LIMIT_TIME) * 60
+        self.key_ttl = int(limit_time or settings.SECURITY_LOGIN_LIMIT_TIME) * 60
 
     def block(self):
         cache.set(self.block_key, True, self.key_ttl)
@@ -218,6 +218,10 @@ class BlockGlobalIpUtilBase:
 class LoginBlockUtil(BlockUtilBase):
     LIMIT_KEY_TMPL = "_LOGIN_LIMIT_{}_{}"
     BLOCK_KEY_TMPL = "_LOGIN_BLOCK_{}"
+
+
+class ActiveUserBlockUtil(BlockUtil):
+    BLOCK_KEY_TMPL = "_ACTIVE_USER_BLOCK_{}"
 
 
 class MFABlockUtils(BlockUtilBase):

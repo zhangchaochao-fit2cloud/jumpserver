@@ -18,6 +18,7 @@ from orgs.utils import tmp_to_root_org
 from users.notifications import PasswordExpirationReminderMsg
 from users.notifications import UserExpirationReminderMsg
 from .models import User
+from .utils import ActiveUserBlockUtil
 
 logger = get_logger(__file__)
 
@@ -82,7 +83,7 @@ def check_user_expired_periodic():
 
 
 @shared_task(verbose_name=_('Check unused users'))
-@register_as_period_task(crontab=CRONTAB_AT_PM_TWO)
+@register_as_period_task(crontab=settings.CRONTAB_INACTIVE_USERS_TIME)
 @tmp_to_root_org()
 def check_unused_users():
     uncommon_users_ttl = settings.SECURITY_UNCOMMON_USERS_TTL
@@ -111,10 +112,13 @@ def check_unused_users():
     print("Some users are not used for a long time, and they will be disabled.")
     resource_ids = []
     for user in users:
+        if ActiveUserBlockUtil(user.id).is_block():
+            continue
         resource_ids.append(user.id)
         print('  - {}'.format(user.name))
+        user.is_active = False
+        user.save()
 
-    users.update(is_active=False)
     from audits.signal_handlers import create_activities
     if current_task:
         task_id = current_task.request.id
